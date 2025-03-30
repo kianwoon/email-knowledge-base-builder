@@ -1,0 +1,33 @@
+version: 1
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker-compose.yml
+    env:
+      - key: PORT
+        value: "8000"
+      - key: ENVIRONMENT
+        value: "production"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      path: /health
+      interval: 10
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker-compose.yml
+    env:
+      - key: PORT
+        value: "3000"
+      - key: ENVIRONMENT
+        value: "production"
+    ports:
+      - "3000:3000"
+    healthcheck:
+      path: /
+      interval: 10
+    restart: always
