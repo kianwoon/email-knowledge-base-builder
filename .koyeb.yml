@@ -4,6 +4,8 @@ services:
     build:
       context: .
       dockerfile: docker-compose.yml
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     env:
       - key: PORT
         value: "8000"
@@ -15,11 +17,18 @@ services:
       path: /health
       interval: 10
     restart: always
+    type: web
+    instance_type: nano
+    min_scale: 1
+    max_scale: 1
+    regions: ["was"]
 
   frontend:
     build:
       context: .
       dockerfile: docker-compose.yml
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     env:
       - key: PORT
         value: "3000"
@@ -31,3 +40,8 @@ services:
       path: /
       interval: 10
     restart: always
+    type: web
+    instance_type: nano
+    min_scale: 1
+    max_scale: 1
+    regions: ["was"]
