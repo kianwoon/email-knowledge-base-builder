@@ -1,41 +1,77 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 
-// API base URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Get the API base URL from environment variables
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL?.trim();
+
+// Debug environment variables
+console.log('=== Auth API Configuration ===');
+console.log('Environment Mode:', import.meta.env.MODE);
+console.log('VITE_BACKEND_URL:', import.meta.env.VITE_BACKEND_URL);
+console.log('Final API_BASE_URL:', API_BASE_URL);
+
+if (!API_BASE_URL) {
+  console.error('API_BASE_URL is not configured properly');
+}
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json'
   },
+  timeout: 10000 // 10 second timeout
 });
 
 // Add request interceptor to include auth token
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log('=== Auth API Request ===');
+    console.log('Full Request URL:', `${config.baseURL}${config.url}`);
+    console.log('Request Method:', config.method?.toUpperCase());
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('=== Auth API Request Error ===');
+    console.error('Request failed:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => {
+    console.log('=== Auth API Response ===');
+    console.log('Response Status:', response.status);
+    return response;
+  },
+  (error) => {
+    console.error('=== Auth API Response Error ===');
+    console.error('Response Error:', error);
+    if (error.response) {
+      console.error('Error Response Status:', error.response.status);
+    }
+    return Promise.reject(error);
+  }
 );
 
 /**
  * Get Microsoft login URL
  */
 export const getLoginUrl = async () => {
+  console.log('=== Getting Login URL ===');
   try {
     const response = await api.get('/auth/login');
+    console.log('Login URL Response:', response.data);
     return response.data;
   } catch (error) {
+    console.error('=== Login URL Error ===');
     console.error('Error getting login URL:', error);
-    // For demo purposes, return a mock URL
-    return { 
-      auth_url: 'http://localhost:8000/auth/callback?mock=true' 
-    };
+    throw error;
   }
 };
 
@@ -69,3 +105,5 @@ export const refreshToken = async () => {
     throw error;
   }
 };
+
+export default api;
