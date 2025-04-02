@@ -1,97 +1,103 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Container, Flex, Heading, Spinner, Text, useToast } from '@chakra-ui/react';
+import { useEffect, useState } from 'react';
+import { Route, Routes, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 
-// Pages
-import SignIn from './pages/SignIn';
-import FilterSetup from './pages/FilterSetup';
-import EmailReview from './pages/EmailReview';
-import Search from './pages/Search';
-import Support from './pages/Support';
-
-// Documentation Pages
-import Documentation from './pages/documentation/Documentation';
-import SecureAuthentication from './pages/documentation/SecureAuthentication';
-import SmartFiltering from './pages/documentation/SmartFiltering';
-import AIAnalysis from './pages/documentation/AIAnalysis';
-import KnowledgeBase from './pages/documentation/KnowledgeBase';
-
-// Components
-import Navbar from './components/Navbar';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
-  // Check for token on load
+  const navigate = useNavigate();
+  const toast = useToast();
+
+  const { data: user, isLoading } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => {
+      try {
+        const response = await axios.get(`${BACKEND_URL}/auth/me`, {
+          withCredentials: true
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching user:', error);
+        return null;
+      }
+    }
+  });
+
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      // In a real app, we would validate the token here
+    if (user) {
       setIsAuthenticated(true);
+    } else {
+      setIsAuthenticated(false);
     }
-    
-    // Check for token in URL (from OAuth redirect)
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get('token');
-    const expires = urlParams.get('expires');
-    
-    if (urlToken && expires) {
-      localStorage.setItem('token', urlToken);
-      localStorage.setItem('expires', expires);
-      setIsAuthenticated(true);
-      
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
+  }, [user]);
+
+  const handleLogin = async () => {
+    try {
+      const response = await axios.get(`${BACKEND_URL}/auth/login`, {
+        withCredentials: true
+      });
+      window.location.href = response.data.auth_url;
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: 'Login Error',
+        description: 'Failed to initiate login. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
-  }, []);
-  
-  // Handle logout
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('expires');
-    setIsAuthenticated(false);
   };
-  
-  return (
-    <Router>
-      <Flex direction="column" minH="100vh">
-        {isAuthenticated && <Navbar onLogout={handleLogout} />}
-        
-        <Routes>
-          {/* Documentation Routes - accessible without authentication and no padding */}
-          <Route path="/docs" element={<Documentation />} />
-          <Route path="/docs/secure-authentication" element={<SecureAuthentication />} />
-          <Route path="/docs/smart-filtering" element={<SmartFiltering />} />
-          <Route path="/docs/ai-analysis" element={<AIAnalysis />} />
-          <Route path="/docs/knowledge-base" element={<KnowledgeBase />} />
-          <Route path="/support" element={<Support />} />
-          
-          {/* App Routes - with padding and authentication */}
-          <Route path="/*" element={
-            <Box flex="1" p={4}>
-              <Routes>
-                <Route 
-                  path="/" 
-                  element={isAuthenticated ? <Navigate to="/filter" /> : <SignIn onLogin={() => setIsAuthenticated(true)} />} 
-                />
-                <Route 
-                  path="/filter" 
-                  element={isAuthenticated ? <FilterSetup /> : <Navigate to="/" />} 
-                />
-                <Route 
-                  path="/review" 
-                  element={isAuthenticated ? <EmailReview /> : <Navigate to="/" />} 
-                />
-                <Route 
-                  path="/search" 
-                  element={isAuthenticated ? <Search /> : <Navigate to="/" />} 
-                />
-              </Routes>
-            </Box>
-          } />
-        </Routes>
+
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${BACKEND_URL}/auth/logout`, {}, {
+        withCredentials: true
+      });
+      setIsAuthenticated(false);
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: 'Logout Error',
+        description: 'Failed to logout. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Flex height="100vh" alignItems="center" justifyContent="center">
+        <Spinner size="xl" />
       </Flex>
-    </Router>
+    );
+  }
+
+  return (
+    <Container maxW="container.xl" py={8}>
+      <Box textAlign="center" fontSize="xl">
+        <Heading>Email Knowledge Base Builder</Heading>
+        {!isAuthenticated ? (
+          <Box mt={8}>
+            <Text mb={4}>Please login with your Microsoft account to continue</Text>
+            <Button colorScheme="blue" onClick={handleLogin}>
+              Login with Microsoft
+            </Button>
+          </Box>
+        ) : (
+          <Routes>
+            <Route path="/" element={<EmailDashboard onLogout={handleLogout} />} />
+            <Route path="/callback" element={<AuthCallback />} />
+          </Routes>
+        )}
+      </Box>
+    </Container>
   );
 }
 
